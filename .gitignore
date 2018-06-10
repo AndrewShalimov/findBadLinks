@@ -1,0 +1,37 @@
+*.log
+/*.log
+*.json
+/*.json
+logs
+out
+images/products
+tmp
+.history
+dist
+/.idea
+/*.iml
+/out
+/.idea
+/.idea_modules
+/.classpath
+/.project
+/RUNNING_PID
+/.settings
+version.properties
+/version.properties
+log/**
+archived/**
+build.properties
+resin-data/**
+node_modules
+credentials.properties
+target
+app_config.json
+/src/main/resources/app_config.json
+<<<<<<< HEAD
+catalog.xlsx
+credentials
+/.credentials
+=======
+credentials/
+>>>>>>> 1c901cd85b9c77e3ced8d8a5fd1e27e1f6feda66
