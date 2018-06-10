@@ -265,7 +265,8 @@ public class PostAnalyser {
         try {
             OpenLoadClient.OpenLoadResponse uploadResult = null;
             try {
-                uploadResult = openLoadClient.uploadFile(fileToUpload, "");
+                String uploadFolder = (String) ((JSONObject) config.get("openLoad")).get("uploadFolder");
+                uploadResult = openLoadClient.uploadFile(fileToUpload, uploadFolder);
             } catch (OpenLoadException e) {
                 String infoLine = String.format("Error uploading file '%s' to OpenLoad: " + e.getMessage(), fileToUpload);
                 logger.info(infoLine);
