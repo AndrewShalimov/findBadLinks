@@ -27,11 +27,9 @@ node_modules
 credentials.properties
 target
 app_config.json
+/src/main/resources/client_secret_node
 /src/main/resources/app_config.json
-<<<<<<< HEAD
 catalog.xlsx
 credentials
 /.credentials
-=======
 credentials/
->>>>>>> 1c901cd85b9c77e3ced8d8a5fd1e27e1f6feda66
