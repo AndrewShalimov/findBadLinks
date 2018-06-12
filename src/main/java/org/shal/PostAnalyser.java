@@ -249,11 +249,15 @@ public class PostAnalyser {
         while (!executor.isTerminated() && !timeToStop) ;
 
         logger.info("Restore process completed. Successfully restored {} files. Failed to restore {} files.", successFileNames.size(), failedFileNames.size());
-
-        String emailBody = "Files restored successfully " + successFileNames.size() + " of total abused " + abusedFiles.size() + " :\n\n" + String.join("\n", successFileNames);
-        sendMail("Files restored successfully", emailBody);
-        emailBody = "Files failed to restore " + failedFileNames.size() + " of total abused " + abusedFiles.size() + " :\n\n" + String.join("\n", failedFileNames);
-        sendMail("Files failed to restore", emailBody);
+        String emailBody = "";
+        if (!isEmpty(successFileNames)) {
+            emailBody = "Files restored successfully " + successFileNames.size() + " of total abused " + abusedFiles.size() + " :\n\n" + String.join("\n", successFileNames);
+            sendMail("Files restored successfully", emailBody);
+        }
+        if (!isEmpty(failedFileNames)) {
+            emailBody = "Files failed to restore " + failedFileNames.size() + " of total abused " + abusedFiles.size() + " :\n\n" + String.join("\n", failedFileNames);
+            sendMail("Files failed to restore", emailBody);
+        }
         System.exit(0);
     }
 
