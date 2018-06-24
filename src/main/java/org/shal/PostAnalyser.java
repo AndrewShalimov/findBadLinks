@@ -246,7 +246,10 @@ public class PostAnalyser {
         toolkit = Toolkit.getDefaultToolkit();
         timer = new Timer();
         timer.schedule(new RemindTask(), TimeUnit.HOURS.toMillis(2));
-        while (!executor.isTerminated() && !timeToStop) ;
+        while (!executor.isTerminated() && !timeToStop) {
+            //do process
+        };
+        executor.shutdownNow();
 
         logger.info("Restore process completed. Successfully restored {} files. Failed to restore {} files.", successFileNames.size(), failedFileNames.size());
         String emailBody = "";
@@ -473,8 +476,10 @@ public class PostAnalyser {
         toolkit = Toolkit.getDefaultToolkit();
         timer = new Timer();
         timer.schedule(new RemindTask(), TimeUnit.HOURS.toMillis(timeoutHours));
-        while (!executor.isTerminated() && !timeToStop) ;
-
+        while (!executor.isTerminated() && !timeToStop) {
+            //do process
+        };
+        executor.shutdownNow();
         long after = System.currentTimeMillis();
         logger.info("------- done verifying links. It took " + (after - before) + " ms.");
     }

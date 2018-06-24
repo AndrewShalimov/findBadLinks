@@ -1,18 +1,21 @@
 import com.google.common.collect.Lists;
 import org.junit.Before;
 import org.junit.Test;
+import org.shal.PostAnalyser;
 import org.shal.Utils;
 
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
 
 public class ExecutorTest {
 
     private ClassLoader classLoader;
+    private boolean timeToStop = false;
+    Toolkit toolkit = Toolkit.getDefaultToolkit();
 
     @Before
     public void init() {
@@ -105,6 +108,47 @@ public class ExecutorTest {
             }
             threadToRun.start();
             return null;
+        }
+    }
+
+
+
+    @Test
+    public void executorTerminationTest() throws ExecutionException, IOException, TimeoutException {
+
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        for (int i = 0; i < 10000; i++) {
+            int finalI = i;
+            Thread worker = new Thread(() -> {
+                doStaff(finalI);
+            }, "worker__" + System.identityHashCode(i));
+            executor.execute(worker);
+        }
+
+        Timer timer = new Timer();
+        timer.schedule(new RemindTask(), TimeUnit.SECONDS.toMillis(10));
+        while (!executor.isTerminated() && !timeToStop)  {
+            //process
+        };
+        executor.shutdownNow();
+
+
+    }
+
+    private void doStaff(int i)  {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println("------- did staff: " + i);
+    }
+
+    class RemindTask extends TimerTask {
+        public void run() {
+            System.out.println("Time's up!");
+            toolkit.beep();
+            timeToStop = true;
         }
     }
 
