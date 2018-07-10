@@ -40,7 +40,7 @@
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>libs/</classpathPrefix>
                             <!-- Jar file entry point -->
-                            <mainClass>org.shal.PostAnalyser</mainClass>
+                            <mainClass>org.posts.PostAnalyser</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -55,7 +55,7 @@
                             <!--<addClasspath>true</addClasspath>-->
                             <!--<classpathPrefix>libs/</classpathPrefix>-->
                             <!--&lt;!&ndash; Jar file entry point &ndash;&gt;-->
-                            <!--<mainClass>org.shal.PostAnalyser</mainClass>-->
+                            <!--<mainClass>org.postss.PostAnalyser</mainClass>-->
                         <!--</manifest>-->
                     <!--</archive>-->
                 <!--</configuration>-->

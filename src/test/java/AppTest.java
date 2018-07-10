@@ -1,17 +1,3 @@
-import org.junit.Before;
-import org.junit.Test;
-import org.shal.PostAnalyser;
-import org.shal.Utils;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URISyntaxException;
-import java.util.List;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-
 public class AppTest {
 
 //    private PostAnalyser analyser;

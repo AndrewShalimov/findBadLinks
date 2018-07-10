@@ -1,4 +1,4 @@
-package org.shal;
+package org.posts;
 
 public class OpenLoadException extends Exception {
 

@@ -1,4 +1,4 @@
-package org.shal.model;
+package org.posts.model;
 
 import java.util.Objects;
 

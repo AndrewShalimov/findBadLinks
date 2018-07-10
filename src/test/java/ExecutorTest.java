@@ -1,8 +1,7 @@
 import com.google.common.collect.Lists;
 import org.junit.Before;
 import org.junit.Test;
-import org.shal.PostAnalyser;
-import org.shal.Utils;
+import org.posts.Utils;
 
 import java.awt.*;
 import java.io.File;

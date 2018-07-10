@@ -1,19 +1,5 @@
 import com.afrozaar.wordpress.wpapi.v2.Wordpress;
-import com.afrozaar.wordpress.wpapi.v2.model.Post;
-import com.afrozaar.wordpress.wpapi.v2.request.Request;
-import com.afrozaar.wordpress.wpapi.v2.request.SearchRequest;
-import com.afrozaar.wordpress.wpapi.v2.response.PagedResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.json.JSONObject;
-import org.junit.Before;
-import org.junit.Test;
-import org.shal.OpenLoadClient;
-import org.shal.PostAnalyser;
-import org.shal.model.OpenLoadUploadStatus;
-
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.util.List;
+import org.posts.PostAnalyser;
 
 public class WordPressPostsTest {
 

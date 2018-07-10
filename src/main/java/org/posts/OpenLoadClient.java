@@ -1,4 +1,4 @@
-package org.shal;
+package org.posts;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
@@ -8,17 +8,11 @@ import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.request.BaseRequest;
 import com.mashape.unirest.request.body.MultipartBody;
 import org.apache.commons.lang3.StringEscapeUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.shal.model.OpenLoadUploadStatus;
+import org.posts.model.OpenLoadUploadStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +24,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.shal.Utils.isEmpty;
+import static org.posts.Utils.isEmpty;
 
 public class OpenLoadClient {
 
@@ -266,29 +260,21 @@ public class OpenLoadClient {
             return false;
         }
 
-        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+        try {
             String openLoadLink = String.format(openLoadApiUrl + "file/info?file=%s" + openLoadCredentials, openLoadId, apiLogin, apiKey);
-            HttpGet httpGet = new HttpGet(openLoadLink);
-            ResponseHandler<String> responseHandler = response -> {
-                int status = response.getStatusLine().getStatusCode();
-                if (status >= 200 && status < 300) {
-                    HttpEntity entity = response.getEntity();
-                    return entity == null ? null : EntityUtils.toString(entity);
-                } else {
-                    HttpEntity entity = response.getEntity();
-                    logger.error(EntityUtils.toString(entity));
-                    return null;
-                }
-            };
-            String responseBody = httpclient.execute(httpGet, responseHandler);
-            if (isEmpty(responseBody)) {
+            //Unirest.setTimeouts();
+            HttpResponse<JsonNode> response = Unirest.get(openLoadLink)
+                    .headers(openLoadHeaders)
+                    .asJson();
+            if (response.getStatus() >= 200 && response.getStatus() < 300) {
+                JSONObject responseJson = response.getBody().getObject();
+                int fileStatus = (int) ((JSONObject) ((JSONObject) responseJson.get("result")).get(openLoadId)).get("status");
+                return fileStatus == 200;
+            } else {
                 return false;
             }
-            JSONObject response = new JSONObject(responseBody);
-            int fileStatus = (int) ((JSONObject) ((JSONObject) response.get("result")).get(openLoadId)).get("status");
-            return fileStatus == 200;
         } catch (Exception e) {
-            logger.debug(e.getMessage());
+            logger.error(e.getMessage());
             return false;
         }
     }

@@ -1,9 +1,8 @@
-package org.shal;
+package org.posts;
 
 import com.afrozaar.wordpress.wpapi.v2.Wordpress;
 import com.afrozaar.wordpress.wpapi.v2.config.ClientConfig;
 import com.afrozaar.wordpress.wpapi.v2.config.ClientFactory;
-import com.afrozaar.wordpress.wpapi.v2.model.Content;
 import com.afrozaar.wordpress.wpapi.v2.model.Post;
 import com.afrozaar.wordpress.wpapi.v2.model.builder.ContentBuilder;
 import com.afrozaar.wordpress.wpapi.v2.request.Request;
@@ -14,6 +13,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
+import org.posts.shedulers.ScheduledTask;
+import org.posts.shedulers.TimeoutScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,19 +24,18 @@ import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
-import static org.shal.Utils.getStackTrace;
-import static org.shal.Utils.isEmpty;
+import static org.posts.Utils.getStackTrace;
+import static org.posts.Utils.isEmpty;
 
 public class PostAnalyser {
 
@@ -59,6 +59,7 @@ public class PostAnalyser {
     private List<String> failedFileNames = Collections.synchronizedList(new ArrayList<>());
     private List<String> successFileNames = Collections.synchronizedList(new ArrayList<>());
     private final static String ABUSED_BACKUP_FOLDER = "abused_backup/";
+    private boolean stopMe = false;
 
 
     public static void main(String[] args) {
@@ -99,7 +100,11 @@ public class PostAnalyser {
         if ("analyse_wp_links".equals(parameter)) {
             analyzer.readPosts();
             analyzer.filterPosts();
-            analyzer.analyzeLinks();
+            try {
+                analyzer.analyzeLinks();
+            } catch (InterruptedException e) {
+                logger.warn("Interrupted by timeout: " + e.getMessage());
+            }
             List<ResultPostAnalyse> badPosts = analyzer.results.stream().filter(post -> !post.alive).collect(toList());
 
             if (badPosts.isEmpty()) {
@@ -264,8 +269,6 @@ public class PostAnalyser {
         System.exit(0);
     }
 
-
-
     private void uploadFileAndUpdatePost(String fileToUpload) {
         long postId = 0L;
         String fileName = "";
@@ -290,10 +293,20 @@ public class PostAnalyser {
             PagedResponse<Post> response = wordPressClient.search(request);
             List<Post> posts = response.getList();
             if (isEmpty(posts)) {
-                String infoLine = "Post with key '" + fileName + "' was NOT found in WordPress.";
-                logger.info(infoLine);
-                failedFileNames.add(infoLine);
-                return;
+                fileName = URLEncoder.encode(fileName, "UTF-8");
+                request = SearchRequest.Builder.aSearchRequest(Post.class)
+                        .withUri(Request.POSTS)
+                        .withParam("search", fileName)
+                        .withParam("context", "edit")
+                        .build();
+                response = wordPressClient.search(request);
+                posts = response.getList();
+                if (isEmpty(posts)) {
+                    String infoLine = "Post with key '" + fileName + "' was NOT found in WordPress.";
+                    logger.info(infoLine);
+                    failedFileNames.add(infoLine);
+                    return;
+                }
             }
             if (posts.size() > 1) {
                 String infoLine = "Search key '" + fileName + "' was found with more then 1 post. Update it manually.";
@@ -318,7 +331,6 @@ public class PostAnalyser {
             return;
         }
     }
-
 
     public void sendMail(String subject, String emailBody) {
         String smtpHost = (String) ((JSONObject) ((JSONObject) config.get("mailServer")).get("smtp")).get("address");
@@ -403,13 +415,12 @@ public class PostAnalyser {
         } catch (Exception e) {
             logger.error(e.getMessage());
         }
-
         return pages;
     }
 
     private void readPosts() {
         int callsCount = totalFoundPages;
-        //int callsCount = 5;
+       // int callsCount = 5;
         executor = Executors.newFixedThreadPool(wpWorkersCount);
         long before = System.currentTimeMillis();
         for (int i = 1; i <= callsCount; i++) {
@@ -458,10 +469,11 @@ public class PostAnalyser {
         logger.info("------- filtering posts is done. Posts remains to check: " + allPosts.size());
     }
 
-    private void analyzeLinks() {
+    private void analyzeLinks() throws InterruptedException {
         logger.info("------- start verifying links");
         executor = Executors.newFixedThreadPool(openLoadWorkersCount);
         long before = System.currentTimeMillis();
+        List<Future> tasks = Lists.newArrayList();
         for (Post post : allPosts) {
             String content = post.getContent().getRaw();
             String link = linkExtractor(content);
@@ -470,16 +482,35 @@ public class PostAnalyser {
                 results.add(resultPost);
                 logger.info(resultPost + ", request:" + results.size() + " of " + allPosts.size());
             }, "worker_post_" + System.identityHashCode(post));
-            executor.execute(worker);
+            Future task = executor.submit(worker);
+            tasks.add(task);
         }
         executor.shutdown();
-        toolkit = Toolkit.getDefaultToolkit();
-        timer = new Timer();
-        timer.schedule(new RemindTask(), TimeUnit.HOURS.toMillis(timeoutHours));
-        while (!executor.isTerminated() && !timeToStop) {
-            //do process
-        };
+        executor.awaitTermination(timeoutHours, TimeUnit.HOURS);
         executor.shutdownNow();
+//        new TimeoutScheduler(10, TimeUnit.SECONDS, new ScheduledTask() {
+//            @Override
+//            public void run() {
+//                System.out.println("------------ stopping...");
+//                stopMe = true;
+//            }
+//        });
+//        while (!executor.isTerminated()) {
+//            //do process
+//            if (stopMe) {
+//                logger.info("Interrupted by timeout");
+//                executor.shutdownNow();
+//                return;
+//            }
+//        };
+//
+//        toolkit = Toolkit.getDefaultToolkit();
+//        timer = new Timer();
+//        timer.schedule(new RemindTask(), TimeUnit.HOURS.toMillis(timeoutHours));
+//        while (!executor.isTerminated() && !timeToStop) {
+//            //do process
+//        };
+        //executor.shutdownNow();
         long after = System.currentTimeMillis();
         logger.info("------- done verifying links. It took " + (after - before) + " ms.");
     }

@@ -1,4 +1,4 @@
-package org.shal;
+package org.posts;
 
 import javax.mail.Message;
 import javax.mail.MessagingException;

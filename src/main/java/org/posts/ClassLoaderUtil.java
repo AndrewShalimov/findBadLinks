@@ -2,7 +2,7 @@
  * Copyright (c) 2002-2003 by OpenSymphony
  * All rights reserved.
  */
-package org.shal;
+package org.posts;
 
 import java.io.IOException;
 import java.io.InputStream;
