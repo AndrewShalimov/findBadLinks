@@ -1,5 +1,24 @@
 import com.afrozaar.wordpress.wpapi.v2.Wordpress;
+import com.afrozaar.wordpress.wpapi.v2.model.Post;
+import com.afrozaar.wordpress.wpapi.v2.request.Request;
+import com.afrozaar.wordpress.wpapi.v2.request.SearchRequest;
+import com.afrozaar.wordpress.wpapi.v2.response.PagedResponse;
+import org.junit.Before;
+import org.junit.Test;
 import org.posts.PostAnalyser;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.util.List;
+
+import static org.posts.Utils.isEmpty;
 
 public class WordPressPostsTest {
 
@@ -7,15 +26,41 @@ public class WordPressPostsTest {
     private ClassLoader classLoader;
     private Wordpress wordPressClient;
 
-//    @Before
-//    public void init() throws IOException, URISyntaxException {
-//        analyser = new PostAnalyser();
-//        analyser.readConfiguration();
-//        analyser.initClient();
-//        classLoader = getClass().getClassLoader();
-//        wordPressClient = analyser.getWordPressClient();
+    @Before
+    public void init() throws IOException, URISyntaxException {
+        analyser = new PostAnalyser();
+        analyser.readConfiguration();
+        analyser.initClient();
+        classLoader = getClass().getClassLoader();
+        wordPressClient = analyser.getWordPressClient();
+    }
+
+
+    @Test
+    public void searchEncodedFiles() throws Exception {
+        String fileName = "wrecked.209.hdtv-lol%5Bettv%5D.mkv.mp4";
+        SearchRequest request = SearchRequest.Builder.aSearchRequest(Post.class)
+                .withUri(Request.POSTS)
+                .withParam("search", fileName)
+                .withParam("context", "edit")
+                .build();
+        PagedResponse<Post> response = wordPressClient.search(request);
+        List<Post> posts = response.getList();
+        System.out.println(posts);
+    }
+
+//    @Test
+//    public void hardCoreWP_test() throws Exception {
+//        String fileName = "wrecked.209.hdtv-lol[ettv].mkv.mp4";
+//        fileName = "wrecked";
+//        tuneTrustedCertificates();
+//        List<Post> posts = analyser.tryHardCoreWordPressSearch(fileName);
+//        System.out.println(posts);
 //    }
-//
+
+
+
+
 //
 //    //@Test
 //    public void searchPostTest() throws Exception {

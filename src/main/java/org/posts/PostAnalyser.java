@@ -8,23 +8,31 @@ import com.afrozaar.wordpress.wpapi.v2.model.builder.ContentBuilder;
 import com.afrozaar.wordpress.wpapi.v2.request.Request;
 import com.afrozaar.wordpress.wpapi.v2.request.SearchRequest;
 import com.afrozaar.wordpress.wpapi.v2.response.PagedResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-import org.posts.shedulers.ScheduledTask;
-import org.posts.shedulers.TimeoutScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
@@ -285,28 +293,19 @@ public class PostAnalyser {
             }
 
             fileName = uploadResult.fileName;
-            SearchRequest request = SearchRequest.Builder.aSearchRequest(Post.class)
-                    .withUri(Request.POSTS)
-                    .withParam("search", fileName)
-                    .withParam("context", "edit")
-                    .build();
-            PagedResponse<Post> response = wordPressClient.search(request);
-            List<Post> posts = response.getList();
+            List<Post> posts = tryOrdinaryWordPressSearch(fileName);
             if (isEmpty(posts)) {
-                fileName = URLEncoder.encode(fileName, "UTF-8");
-                request = SearchRequest.Builder.aSearchRequest(Post.class)
-                        .withUri(Request.POSTS)
-                        .withParam("search", fileName)
-                        .withParam("context", "edit")
-                        .build();
-                response = wordPressClient.search(request);
-                posts = response.getList();
-                if (isEmpty(posts)) {
-                    String infoLine = "Post with key '" + fileName + "' was NOT found in WordPress.";
-                    logger.info(infoLine);
-                    failedFileNames.add(infoLine);
-                    return;
-                }
+                posts = tryEncodedWordPressSearch(fileName);
+            }
+            if (isEmpty(posts)) {
+                posts = tryHardCoreWordPressSearch(fileName);
+            }
+
+            if (isEmpty(posts)) {
+                String infoLine = "Post with key '" + fileName + "' was NOT found in WordPress.";
+                logger.info(infoLine);
+                failedFileNames.add(infoLine);
+                return;
             }
             if (posts.size() > 1) {
                 String infoLine = "Search key '" + fileName + "' was found with more then 1 post. Update it manually.";
@@ -330,6 +329,62 @@ public class PostAnalyser {
             failedFileNames.add(infoLine);
             return;
         }
+    }
+
+    private List<Post> tryHardCoreWordPressSearch(String fileName)  {
+        List<Post> result = Lists.newArrayList();
+        try {
+            fileName = URLEncoder.encode(fileName, "UTF-8");
+            fileName = URLEncoder.encode(fileName, "UTF-8");
+            String requestUrl = "http://stream-tv-series.xyz/wp/wp-admin/edit.php?s=" + fileName + "&post_status=all&post_type=post&paged=1";
+            String wordPressNonSecureCookie = (String) ((JSONObject) config.get("wordPress")).get("cookie");
+            Map wordPressHeaders = new HashMap() {{
+                put("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36");
+                put("Referer", "http://stream-tv-series.xyz/wp/wp-admin/edit.php");
+//                put("Cookie", (String) ((JSONObject) config.get("wordPress")).get("cookie_s"));
+                put("Cookie", (String) ((JSONObject) config.get("wordPress")).get("cookie"));
+            }};
+            HttpResponse<String> response = Unirest.get(requestUrl)
+                    .headers(wordPressHeaders)
+                    .asString();
+            if (response.getStatus() >= 200 && response.getStatus() < 300) {
+                String responseBody = response.getBody();
+                if (!isEmpty(responseBody) && responseBody.contains("\"post_ID\"")) {
+                    Pattern pattern = Pattern.compile("var postTabs = (.*?);");
+                    Matcher matcher = pattern.matcher(responseBody);
+                    while (matcher.find()) {
+                        String postIdLine = matcher.group(1);
+                        String postId = new ObjectMapper().readTree(postIdLine).get("post_ID").asText();
+                        Post post = wordPressClient.getPost(new Long(postId), "edit");
+                        result.add(post);
+                    }
+                } else {
+                    return result;
+                }
+            } else {
+                return result;
+            }
+        } catch (Exception e) {
+            logger.warn(getStackTrace(e));
+            return result;
+        }
+        return result;
+    }
+
+    private List<Post> tryEncodedWordPressSearch(String fileName) throws UnsupportedEncodingException {
+        fileName = URLEncoder.encode(fileName, "UTF-8");
+        return tryOrdinaryWordPressSearch(fileName);
+    }
+
+    private List<Post> tryOrdinaryWordPressSearch(String fileName) {
+        SearchRequest request = SearchRequest.Builder.aSearchRequest(Post.class)
+                .withUri(Request.POSTS)
+                .withParam("search", fileName)
+                .withParam("context", "edit")
+                .build();
+        PagedResponse<Post> response = wordPressClient.search(request);
+        List<Post> posts = response.getList();
+        return posts;
     }
 
     public void sendMail(String subject, String emailBody) {
@@ -395,6 +450,7 @@ public class PostAnalyser {
             openLoadWorkersCount = 5;
             timeoutHours = 3;
         }
+        tuneTrustedCertificates();
     }
 
     private int getTotalPages() {
@@ -467,6 +523,37 @@ public class PostAnalyser {
             }
         }).collect(toList());
         logger.info("------- filtering posts is done. Posts remains to check: " + allPosts.size());
+    }
+
+    private void tuneTrustedCertificates() {
+        final TrustManager[] trustAllCertificates = new TrustManager[]{
+                new X509TrustManager() {
+                    @Override
+                    public X509Certificate[] getAcceptedIssuers() {
+                        return null; // Not relevant.
+                    }
+
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        // Do nothing. Just allow them all.
+                    }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        // Do nothing. Just allow them all.
+                    }
+                }
+        };
+
+        try {
+            System.setProperty("jsse.enableSNIExtension", "false");
+            SSLContext sc = SSLContext.getInstance("SSL");
+            sc.init(null, trustAllCertificates, new SecureRandom());
+            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+            System.setProperty("https.protocols", "TLSv1,TLSv1.1,TLSv1.2");
+        } catch (GeneralSecurityException e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     private void analyzeLinks() throws InterruptedException {
