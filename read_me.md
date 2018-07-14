@@ -10,3 +10,5 @@ pause
 
 mvn clean package -Dmaven.test.skip=true
 mvn -Dtest=GoogleTest#testUpdateConfig test
+
+https://stackoverflow.com/questions/3685548/java-keytool-easy-way-to-add-server-cert-from-url-port

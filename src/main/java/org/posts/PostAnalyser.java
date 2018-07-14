@@ -1,5 +1,6 @@
 package org.posts;
 
+import com.afrozaar.wordpress.wpapi.v2.Client;
 import com.afrozaar.wordpress.wpapi.v2.Wordpress;
 import com.afrozaar.wordpress.wpapi.v2.config.ClientConfig;
 import com.afrozaar.wordpress.wpapi.v2.config.ClientFactory;
@@ -21,16 +22,15 @@ import org.slf4j.LoggerFactory;
 
 import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.*;
 import java.awt.*;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
+import java.nio.file.Files;
 import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.text.SimpleDateFormat;
@@ -50,7 +50,7 @@ public class PostAnalyser {
     private final static Logger logger = LoggerFactory.getLogger(PostAnalyser.class);
     private static final String confFileName = "app_config.json";
     private JSONObject config;
-    private Wordpress wordPressClient;
+    private WordpressCustomClient wordPressClient;
     public OpenLoadClient openLoadClient;
     private List<Post> allPosts = Collections.synchronizedList(new ArrayList<>());
     private List<ResultPostAnalyse> results = Collections.synchronizedList(new ArrayList<>());
@@ -331,43 +331,8 @@ public class PostAnalyser {
         }
     }
 
-    private List<Post> tryHardCoreWordPressSearch(String fileName)  {
-        List<Post> result = Lists.newArrayList();
-        try {
-            fileName = URLEncoder.encode(fileName, "UTF-8");
-            fileName = URLEncoder.encode(fileName, "UTF-8");
-            String requestUrl = "http://stream-tv-series.xyz/wp/wp-admin/edit.php?s=" + fileName + "&post_status=all&post_type=post&paged=1";
-            String wordPressNonSecureCookie = (String) ((JSONObject) config.get("wordPress")).get("cookie");
-            Map wordPressHeaders = new HashMap() {{
-                put("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36");
-                put("Referer", "http://stream-tv-series.xyz/wp/wp-admin/edit.php");
-//                put("Cookie", (String) ((JSONObject) config.get("wordPress")).get("cookie_s"));
-                put("Cookie", (String) ((JSONObject) config.get("wordPress")).get("cookie"));
-            }};
-            HttpResponse<String> response = Unirest.get(requestUrl)
-                    .headers(wordPressHeaders)
-                    .asString();
-            if (response.getStatus() >= 200 && response.getStatus() < 300) {
-                String responseBody = response.getBody();
-                if (!isEmpty(responseBody) && responseBody.contains("\"post_ID\"")) {
-                    Pattern pattern = Pattern.compile("var postTabs = (.*?);");
-                    Matcher matcher = pattern.matcher(responseBody);
-                    while (matcher.find()) {
-                        String postIdLine = matcher.group(1);
-                        String postId = new ObjectMapper().readTree(postIdLine).get("post_ID").asText();
-                        Post post = wordPressClient.getPost(new Long(postId), "edit");
-                        result.add(post);
-                    }
-                } else {
-                    return result;
-                }
-            } else {
-                return result;
-            }
-        } catch (Exception e) {
-            logger.warn(getStackTrace(e));
-            return result;
-        }
+    public List<Post> tryHardCoreWordPressSearch(String fileName)  {
+        List<Post> result = wordPressClient.findPosts(fileName);
         return result;
     }
 
@@ -427,6 +392,8 @@ public class PostAnalyser {
     }
 
     public void initClient() {
+        tuneSSL();
+
         String baseUrl = (String) ((JSONObject) config.get("wordPress")).get("base_url");
         String username = (String) ((JSONObject) config.get("wordPress")).get("user");
         String password = (String) ((JSONObject) config.get("wordPress")).get("password");
@@ -441,7 +408,7 @@ public class PostAnalyser {
         openLoadClient = new OpenLoadClient(openLoadApiLogin, openLoadApiKey, loginVerifyCode, openLoadCookie);
 
         boolean debug = false;
-        wordPressClient = ClientFactory.fromConfig(ClientConfig.of(baseUrl, username, password, true, debug));
+        wordPressClient = new WordpressCustomClient((Client) ClientFactory.fromConfig(ClientConfig.of(baseUrl, username, password, true, debug)));
         totalFoundPages = getTotalPages();
         try {
             openLoadWorkersCount = (Integer) ((JSONObject) config.get("openLoad")).get("workers");
@@ -450,7 +417,7 @@ public class PostAnalyser {
             openLoadWorkersCount = 5;
             timeoutHours = 3;
         }
-        tuneTrustedCertificates();
+
     }
 
     private int getTotalPages() {
@@ -525,36 +492,59 @@ public class PostAnalyser {
         logger.info("------- filtering posts is done. Posts remains to check: " + allPosts.size());
     }
 
-    private void tuneTrustedCertificates() {
-        final TrustManager[] trustAllCertificates = new TrustManager[]{
-                new X509TrustManager() {
-                    @Override
-                    public X509Certificate[] getAcceptedIssuers() {
-                        return null; // Not relevant.
-                    }
+    private static void setSSLFactories(InputStream keyStream, String keyStorePassword, InputStream trustStream) throws Exception {
+        // Get keyStore
+        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
 
-                    @Override
-                    public void checkClientTrusted(X509Certificate[] certs, String authType) {
-                        // Do nothing. Just allow them all.
-                    }
+        // if your store is password protected then declare it (it can be null however)
+        char[] keyPassword = keyStorePassword.toCharArray();
 
-                    @Override
-                    public void checkServerTrusted(X509Certificate[] certs, String authType) {
-                        // Do nothing. Just allow them all.
-                    }
-                }
-        };
+        // load the stream to your store
+        keyStore.load(keyStream, keyPassword);
 
+        // initialize a trust manager factory with the trusted store
+        KeyManagerFactory keyFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyFactory.init(keyStore, keyPassword);
+
+        // get the trust managers from the factory
+        KeyManager[] keyManagers = keyFactory.getKeyManagers();
+
+        // Now get trustStore
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+
+        // if your store is password protected then declare it (it can be null however)
+        //char[] trustPassword = password.toCharArray();
+
+        // load the stream to your store
+        trustStore.load(trustStream, null);
+
+        // initialize a trust manager factory with the trusted store
+        TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustFactory.init(trustStore);
+
+        // get the trust managers from the factory
+        TrustManager[] trustManagers = trustFactory.getTrustManagers();
+
+        // initialize an ssl context to use these managers and set as default
+        SSLContext sslContext = SSLContext.getInstance("SSL");
+        sslContext.init(keyManagers, trustManagers, null);
+        SSLContext.setDefault(sslContext);
+    }
+
+    private void tuneSSL() {
         try {
-            System.setProperty("jsse.enableSNIExtension", "false");
-            SSLContext sc = SSLContext.getInstance("SSL");
-            sc.init(null, trustAllCertificates, new SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-            System.setProperty("https.protocols", "TLSv1,TLSv1.1,TLSv1.2");
-        } catch (GeneralSecurityException e) {
-            throw new ExceptionInInitializerError(e);
+            File file = new File("localKeystore");
+            if (!file.exists()) {
+                InputStream link = Thread.currentThread().getContextClassLoader().getResourceAsStream("localKeystore");
+                Files.copy(link, file.getAbsoluteFile().toPath());
+            }
+            System.setProperty("javax.net.ssl.trustStore", file.getAbsolutePath());
+        } catch (Exception e) {
+            logger.error(getStackTrace(e));
+            System.exit(1);
         }
     }
+
 
     private void analyzeLinks() throws InterruptedException {
         logger.info("------- start verifying links");

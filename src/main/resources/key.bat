@@ -1,0 +1,1 @@
+keytool -import -noprompt -trustcacerts -alias stream-tv-series.xyz -file stream-tv-series.xyz.cert  -keystore localKeystore -storepass changeit -ext san=stream-tv-series.co,stream-tv-series.info,stream-tv-series.net,stream-tv4.me,stream-tv6.co,stream-tv6.me,stream-tv7.co,stream-tv8.me

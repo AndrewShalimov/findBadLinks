@@ -49,14 +49,12 @@ public class WordPressPostsTest {
         System.out.println(posts);
     }
 
-//    @Test
-//    public void hardCoreWP_test() throws Exception {
-//        String fileName = "wrecked.209.hdtv-lol[ettv].mkv.mp4";
-//        fileName = "wrecked";
-//        tuneTrustedCertificates();
-//        List<Post> posts = analyser.tryHardCoreWordPressSearch(fileName);
-//        System.out.println(posts);
-//    }
+    @Test
+    public void hardCoreWP_test() throws Exception {
+        String fileName = "American_Dad_S01E04_Francine's_Flashback.mp4";
+        List<Post> posts = analyser.tryHardCoreWordPressSearch(fileName);
+        System.out.println(posts);
+    }
 
 
 
