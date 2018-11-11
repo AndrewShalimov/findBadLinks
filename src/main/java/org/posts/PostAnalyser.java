@@ -106,9 +106,9 @@ public class PostAnalyser {
             analyzer.sendMail("Abuses report", emailBody);
         }
         if ("analyse_wp_links".equals(parameter)) {
-            analyzer.readPosts();
-            analyzer.filterPosts();
             try {
+                analyzer.readPosts();
+                analyzer.filterPosts();
                 analyzer.analyzeLinks();
             } catch (InterruptedException e) {
                 logger.warn("Interrupted by timeout: " + e.getMessage());
@@ -441,7 +441,7 @@ public class PostAnalyser {
         return pages;
     }
 
-    private void readPosts() {
+    private void readPosts() throws InterruptedException {
         int callsCount = totalFoundPages;
        // int callsCount = 5;
         executor = Executors.newFixedThreadPool(wpWorkersCount);
@@ -451,10 +451,24 @@ public class PostAnalyser {
             Thread worker = new Thread(() -> {
                 requestToWP(finalI);
             }, "worker_post_" + i);
-            executor.execute(worker);
+            executor.submit(worker);
         }
+
+//        try {
+//            executor.shutdownNow();
+//            if (!executor.awaitTermination(timeoutHours, TimeUnit.HOURS)) {
+//                logger.info("Still waiting...");
+//            }
+//        } catch (InterruptedException e) {
+//            logger.error(e.getMessage());
+//        }
+
+        //executor.shutdown();
+        //while (!executor.isTerminated()) ;
+
         executor.shutdown();
-        while (!executor.isTerminated()) ;
+        executor.awaitTermination(5, TimeUnit.MINUTES);
+        executor.shutdownNow();
         long after = System.currentTimeMillis();
         logger.info("------- done reading posts. Found " + allPosts.size() + " posts. It took " + (after - before) + " ms.");
     }
