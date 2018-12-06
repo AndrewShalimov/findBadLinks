@@ -3,6 +3,9 @@ import com.afrozaar.wordpress.wpapi.v2.model.Post;
 import com.afrozaar.wordpress.wpapi.v2.request.Request;
 import com.afrozaar.wordpress.wpapi.v2.request.SearchRequest;
 import com.afrozaar.wordpress.wpapi.v2.response.PagedResponse;
+import org.apache.commons.exec.CommandLine;
+import org.apache.commons.exec.DefaultExecutor;
+import org.apache.commons.exec.PumpStreamHandler;
 import org.junit.Before;
 import org.junit.Test;
 import org.posts.PostAnalyser;
@@ -11,6 +14,7 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
@@ -56,6 +60,26 @@ public class WordPressPostsTest {
         System.out.println(posts);
     }
 
+    @Test
+    public void run_test() throws Exception {
+        String line = "myCommand.exe";
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        CommandLine commandLine = CommandLine.parse(line);
+        DefaultExecutor executor = new DefaultExecutor();
+        PumpStreamHandler streamHandler = new PumpStreamHandler(outputStream);
+        executor.setStreamHandler(streamHandler);
+        executor.setExitValue(1);
+
+        int exitValue = executor.execute(commandLine);
+
+        String output = outputStream.toString();
+
+        Runtime r = Runtime.getRuntime();
+
+        Process p = r.exec("testPlanFileDir + File.separator + scriptName");
+        p.waitFor();
+
+    }
 
 
 
