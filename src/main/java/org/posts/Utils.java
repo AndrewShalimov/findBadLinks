@@ -4,13 +4,16 @@ import com.google.common.base.Joiner;
 import com.google.common.primitives.Ints;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.web.util.UriUtils;
 
 import java.io.*;
 import java.lang.reflect.Field;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 public class Utils {
 
@@ -183,7 +186,7 @@ public class Utils {
         int ch = -1;
         int b, sumb = 0;
         for (int i = 0, more = -1; i < l; i++) {
-		      /* Get next byte b from URL segment s */
+            /* Get next byte b from URL segment s */
             switch (ch = s.charAt(i)) {
                 case '%':
                     ch = s.charAt(++i);
@@ -202,7 +205,7 @@ public class Utils {
                 default:
                     b = ch;
             }
-		      /* Decode byte b as UTF-8, sumb collects incomplete chars */
+            /* Decode byte b as UTF-8, sumb collects incomplete chars */
             if ((b & 0xc0) == 0x80) {            // 10xxxxxx (continuation byte)
                 sumb = (sumb << 6) | (b & 0x3f);    // Add 6 bits to sumb
                 if (--more == 0) sbuf.append((char) sumb); // Add char to sbuf
@@ -665,6 +668,31 @@ public class Utils {
         return url;
     }
 
+    public static String encodeStringToHTML(String inputString) {
+        if (isEmpty(inputString)) {
+            return "";
+        }
+        String encodedString = inputString;
+        if (inputString.contains("'")) {
+            //encodedString = inputString.replace("'", "&#039;");
+            encodedString = inputString.replace("'", "’");
+        }
+        if (inputString.contains("\"")) {
+            encodedString = inputString.replace("'", "&quot;");
+        }
+        if (inputString.contains(">")) {
+            encodedString = inputString.replace("'", "&gt;");
+        }
+        if (inputString.contains("<")) {
+            encodedString = inputString.replace("'", "&lt;");
+        }
+        if (inputString.contains("&")) {
+            encodedString = inputString.replace("'", "and");
+        }
+
+        return encodedString;
+    }
+
 
 
     private static boolean convertSVGwithInkscape(String sourceFileName, String convertedFilename) {
@@ -733,8 +761,33 @@ public class Utils {
         } catch (Exception e) {
             result = encodeUrl(urlString);
         }
-
         return result;
+    }
+
+    public static String encodeString(String incomingString) {
+        String encodedString = "";
+        if (isEmpty(incomingString)) {
+            return "";
+        }
+        try {
+            encodedString = URLEncoder.encode(incomingString, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            logger.warn(e.getMessage());
+        }
+        return encodedString;
+    }
+
+    public static String decodeString(String incomingString) {
+        String decodedString = "";
+        if (isEmpty(incomingString)) {
+            return "";
+        }
+        try {
+            decodedString = UriUtils.decode(incomingString, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            logger.warn(e.getMessage());
+        }
+        return decodedString;
     }
 
 
@@ -772,5 +825,28 @@ public class Utils {
         return sb.toString();
     }
 
+    public static byte[] zip(final String str) {
+        if ((str == null) || (str.length() == 0)) {
+            throw new IllegalArgumentException("Cannot zip null or empty string");
+        }
+
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+            try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(byteArrayOutputStream)) {
+                gzipOutputStream.write(str.getBytes(StandardCharsets.UTF_8));
+            }
+            return byteArrayOutputStream.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to zip content", e);
+        }
+    }
+
+    public static void w(long msToSleep) {
+        try {
+            Thread.sleep(msToSleep);
+        } catch (InterruptedException e) {
+            //logger.warn(e);
+            e.printStackTrace();
+        }
+    }
 
 }

@@ -33,3 +33,6 @@ catalog.xlsx
 credentials
 /.credentials
 credentials/
+StoredCredential
+catalog.txt
+prod/

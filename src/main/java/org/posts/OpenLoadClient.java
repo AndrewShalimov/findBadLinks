@@ -72,6 +72,11 @@ public class OpenLoadClient {
         return resultFiles;
     }
 
+    public OpenLoadResponse createTestResponse() {
+        return new OpenLoadResponse();
+    }
+
+
     public void clearAbusedFiles() throws OpenLoadException {
         try {
             logger.info("-------- Clear Abuses");
@@ -360,6 +365,7 @@ public class OpenLoadClient {
         String folderId;
         String embedLink;
         String fileName;
+        String openLoadLink;
         private Pattern patternFileName = Pattern.compile("([^/]+$)");
 
         public OpenLoadResponse(String htmlBody, String identity) {
@@ -373,6 +379,7 @@ public class OpenLoadClient {
             this.fileName = matcher.group(1);
             this.openLoadId = openLoadUploadStatus.extid;
             this.embedLink = "<iframe src=\"https://openload.co/embed/" + this.openLoadId + "/" + fileName + "\" scrolling=\"no\" frameborder=\"0\" width=\"700\" height=\"430\" allowfullscreen=\"true\" webkitallowfullscreen=\"true\" mozallowfullscreen=\"true\"></iframe>";
+            this.openLoadLink = "https://openload.co/embed/" + this.openLoadId + "/" + fileName;
         }
 
         public OpenLoadResponse() {

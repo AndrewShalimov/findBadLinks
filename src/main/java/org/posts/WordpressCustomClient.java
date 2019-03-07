@@ -1,7 +1,15 @@
 package org.posts;
 
 import com.afrozaar.wordpress.wpapi.v2.Client;
+import com.afrozaar.wordpress.wpapi.v2.api.Contexts;
+import com.afrozaar.wordpress.wpapi.v2.exception.PostCreateException;
+import com.afrozaar.wordpress.wpapi.v2.exception.PostNotFoundException;
 import com.afrozaar.wordpress.wpapi.v2.model.Post;
+import com.afrozaar.wordpress.wpapi.v2.model.PostStatus;
+import com.afrozaar.wordpress.wpapi.v2.model.builder.ContentBuilder;
+import com.afrozaar.wordpress.wpapi.v2.model.builder.ExcerptBuilder;
+import com.afrozaar.wordpress.wpapi.v2.model.builder.PostBuilder;
+import com.afrozaar.wordpress.wpapi.v2.model.builder.TitleBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.mashape.unirest.http.HttpResponse;
@@ -132,5 +140,26 @@ public class WordpressCustomClient extends Client {
             return posts;
         }
         return posts;
+    }
+
+    public Post addPost(String title, String content) {
+        Post newPost = PostBuilder.aPost()
+                .withTitle(TitleBuilder.aTitle().withRendered(title).build())
+//                .withExcerpt(ExcerptBuilder.anExcerpt().withRendered(expectedExcerpt).build())
+                .withContent(ContentBuilder.aContent().withRendered(content).build())
+                .build();
+
+        Post createdPost = null;
+        try {
+            createdPost = this.createPost(newPost, PostStatus.publish);
+        } catch (PostCreateException e) {
+            logger.error(e.getMessage());
+        }
+        return createdPost;
+    }
+
+    @Override
+    public Post getPost(Long id) throws PostNotFoundException {
+        return getPost(id, Contexts.EDIT);
     }
 }
